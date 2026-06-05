@@ -16,6 +16,12 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .anyRequest().permitAll()
+                .requestMatchers("/api/auth/**").permitAll()
+    .requestMatchers("/api/files/**").permitAll()
+    .requestMatchers("/api/jobs/**").hasAnyRole("HR", "CANDIDATE")
+    .requestMatchers("/api/candidates/**").hasRole("HR")
+    .requestMatchers("/api/applications/**").hasAnyRole("HR", "CANDIDATE")
+    .anyRequest().authenticated()
             );
         return http.build();
     }

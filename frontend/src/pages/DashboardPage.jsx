@@ -1,293 +1,329 @@
-import { useState, useEffect } from 'react'
-import { getJobs, getCandidates, getApplications, updateStatus, createJob, deleteJob } from '../services/api'
-import { useAuth } from '../context/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from "react"
+import { getJobs, getCandidates, getApplications, updateStatus, createJob, deleteJob } from "../services/api"
+import { useAuth } from "../context/AuthContext"
+import { useNavigate } from "react-router-dom"
+
+const T = { fontFamily: "'DM Sans', sans-serif" }
+const SORA = { fontFamily: "'Sora', sans-serif" }
+
+const statusColors = {
+  PENDING:  { bg: "#fef9ec", border: "#f5d878", color: "#92600a" },
+  REVIEWED: { bg: "#eff6ff", border: "#93c5fd", color: "#1d4ed8" },
+  ACCEPTED: { bg: "#f0fdf4", border: "#6ee7b7", color: "#15803d" },
+  REJECTED: { bg: "#fef2f2", border: "#fca5a5", color: "#dc2626" },
+}
+const handleDownloadCV = async (candidateId, fullName) => {
+  try {
+    const res = await downloadCV(candidateId)
+    const url = window.URL.createObjectURL(new Blob([res.data]))
+    const link = document.createElement("a")
+    link.href = url
+    link.setAttribute("download", `CV_${fullName.replace(" ", "_")}.pdf`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    console.error("Download failed", e)
+  }
+}
+
+function Avatar({ name, size = 36 }) {
+  const initials = name ? name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) : "??"
+  const palettes = [
+    { bg: "#e0f2fe", color: "#0369a1" },
+    { bg: "#ede9fe", color: "#6d28d9" },
+    { bg: "#d1fae5", color: "#065f46" },
+    { bg: "#fce7f3", color: "#9d174d" },
+    { bg: "#fef3c7", color: "#92400e" },
+    { bg: "#f0fdf4", color: "#15803d" },
+  ]
+  const p = palettes[(name?.charCodeAt(0) || 0) % palettes.length]
+  return (
+    <div style={{ width: size, height: size, borderRadius: "50%", background: p.bg, color: p.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: size * 0.35, fontWeight: 700, flexShrink: 0, ...SORA }}>
+      {initials}
+    </div>
+  )
+}
+
+function StatCard({ label, value, sub, icon }) {
+  return (
+    <div style={{ background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <span style={{ fontSize: 13, color: "#7a9ab5", fontWeight: 500, ...T }}>{label}</span>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg, #0b2d4a, #0a3d48)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {icon}
+        </div>
+      </div>
+      <div style={{ fontSize: 32, fontWeight: 800, color: "#0f2033", lineHeight: 1, ...SORA }}>{value}</div>
+      <div style={{ fontSize: 12, color: "#4dd9c0", fontWeight: 500, ...T }}>{sub}</div>
+    </div>
+  )
+}
 
 export default function DashboardPage() {
   const [jobs, setJobs] = useState([])
   const [candidates, setCandidates] = useState([])
   const [applications, setApplications] = useState([])
-  const [activeTab, setActiveTab] = useState('overview')
-  const [newJob, setNewJob] = useState({ title: '', description: '', location: '', contractType: 'CDI', deadline: '', status: 'OPEN' })
+  const [activeTab, setActiveTab] = useState("overview")
   const [showJobForm, setShowJobForm] = useState(false)
+  const [newJob, setNewJob] = useState({ title: "", description: "", location: "", contractType: "CDI", deadline: "", status: "OPEN" })
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const { user, logoutUser } = useAuth()
   const navigate = useNavigate()
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { setMounted(true); fetchAll() }, [])
 
   const fetchAll = async () => {
     try {
       const [j, c, a] = await Promise.all([getJobs(), getCandidates(), getApplications()])
-      setJobs(j.data)
-      setCandidates(c.data)
-      setApplications(a.data)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setLoading(false)
-    }
+      setJobs(j.data); setCandidates(c.data); setApplications(a.data)
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
   }
 
   const handleStatusChange = async (id, status) => {
-    try {
-      await updateStatus(id, status)
-      fetchAll()
-    } catch (err) { console.error(err) }
+    try { await updateStatus(id, status); fetchAll() } catch (e) { console.error(e) }
   }
 
   const handleCreateJob = async (e) => {
     e.preventDefault()
-    try {
-      await createJob(newJob)
-      setNewJob({ title: '', description: '', location: '', contractType: 'CDI', deadline: '', status: 'OPEN' })
-      setShowJobForm(false)
-      fetchAll()
-    } catch (err) { console.error(err) }
+    try { await createJob(newJob); setShowJobForm(false); setNewJob({ title: "", description: "", location: "", contractType: "CDI", deadline: "", status: "OPEN" }); fetchAll() }
+    catch (e) { console.error(e) }
   }
 
   const handleDeleteJob = async (id) => {
-    if (window.confirm('Delete this job offer?')) {
-      await deleteJob(id)
-      fetchAll()
-    }
-  }
-
-  const initials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??'
-
-  const avatarColor = (name) => {
-    const colors = [
-      { bg: '#ede9fe', color: '#6d28d9' },
-      { bg: '#d1fae5', color: '#065f46' },
-      { bg: '#dbeafe', color: '#1e40af' },
-      { bg: '#fce7f3', color: '#9d174d' },
-      { bg: '#fef3c7', color: '#92400e' },
-    ]
-    const index = name ? name.charCodeAt(0) % colors.length : 0
-    return colors[index]
-  }
-
-  const statusStyle = (status) => {
-    const map = {
-      PENDING: { bg: '#fef3c7', color: '#92400e' },
-      REVIEWED: { bg: '#dbeafe', color: '#1e40af' },
-      ACCEPTED: { bg: '#d1fae5', color: '#065f46' },
-      REJECTED: { bg: '#fee2e2', color: '#dc2626' },
-    }
-    return map[status] || { bg: '#f1f5f9', color: '#475569' }
+    if (window.confirm("Delete this job offer?")) { await deleteJob(id); fetchAll() }
   }
 
   const acceptanceRate = applications.length > 0
-    ? Math.round((applications.filter(a => a.status === 'ACCEPTED').length / applications.length) * 100)
-    : 0
+    ? Math.round((applications.filter(a => a.status === "ACCEPTED").length / applications.length) * 100) : 0
+
+  const tabs = [
+    { id: "overview", label: "Overview", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8"/></svg> },
+    { id: "jobs", label: "Job offers", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg> },
+    { id: "candidates", label: "Candidates", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/><path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg> },
+    { id: "applications", label: "Applications", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg> },
+  ]
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#f8fafc' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ width: '40px', height: '40px', border: '3px solid #e2e8f0', borderTop: '3px solid #6366f1', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
-        <p style={{ color: '#64748b', fontSize: '14px' }}>Loading dashboard...</p>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: "#eef2f7" }}>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ width: 44, height: 44, border: "3px solid rgba(77,217,192,0.2)", borderTop: "3px solid #4dd9c0", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 14px" }} />
+        <p style={{ color: "#7a9ab5", fontSize: 14, ...T }}>Loading dashboard...</p>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 
   return (
-    <div style={s.page}>
+    <div style={{ display: "flex", minHeight: "100vh", background: "#eef2f7", ...T }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=DM+Sans:wght@400;500&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+        select { font-family: 'DM Sans', sans-serif; }
+        input, textarea { font-family: 'DM Sans', sans-serif; }
+        input::placeholder, textarea::placeholder { color: #9ab8d0; }
+      `}</style>
+
       {/* Sidebar */}
-      <div style={s.sidebar}>
-        <div style={s.sidebarLogo}>
-          <div style={s.logoDot} />
-          <span style={s.logoText}>ATS Platform</span>
+      <div style={{ width: 240, background: "linear-gradient(160deg, #071828 0%, #0b2d4a 60%, #0a3d48 100%)", display: "flex", flexDirection: "column", padding: "28px 16px", position: "sticky", top: 0, height: "100vh", flexShrink: 0 }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingLeft: 8, marginBottom: 36 }}>
+          <div style={{ width: 34, height: 34, background: "rgba(255,255,255,0.1)", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(255,255,255,0.15)" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
+              <path d="M2 17l10 5 10-5" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
+              <path d="M2 12l10 5 10-5" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <span style={{ color: "#fff", fontSize: 15, fontWeight: 600, ...SORA, letterSpacing: "-0.01em" }}>ATS Platform</span>
         </div>
 
-        <nav style={s.nav}>
-          {[
-            { id: 'overview', icon: '◉', label: 'Overview' },
-            { id: 'jobs', icon: '📋', label: 'Job offers' },
-            { id: 'candidates', icon: '👥', label: 'Candidates' },
-            { id: 'applications', icon: '📨', label: 'Applications' },
-          ].map(item => (
-            <button
-              key={item.id}
-              style={{ ...s.navItem, ...(activeTab === item.id ? s.navItemActive : {}) }}
-              onClick={() => setActiveTab(item.id)}
-            >
-              <span style={s.navIcon}>{item.icon}</span>
-              {item.label}
+        {/* Nav */}
+        <nav style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+          {tabs.map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: "none", background: activeTab === tab.id ? "rgba(77,217,192,0.12)" : "transparent", color: activeTab === tab.id ? "#4dd9c0" : "rgba(255,255,255,0.55)", fontSize: 13.5, fontWeight: activeTab === tab.id ? 600 : 400, cursor: "pointer", textAlign: "left", transition: "all 0.15s", ...T }}>
+              <span style={{ color: activeTab === tab.id ? "#4dd9c0" : "rgba(255,255,255,0.4)" }}>{tab.icon}</span>
+              {tab.label}
+              {activeTab === tab.id && <div style={{ marginLeft: "auto", width: 4, height: 4, borderRadius: "50%", background: "#4dd9c0" }} />}
             </button>
           ))}
         </nav>
 
-        <div style={s.sidebarFooter}>
-          <div style={s.userCard}>
-            <div style={{ ...s.userAvatar, background: '#ede9fe', color: '#6d28d9' }}>
-              {initials(user?.username)}
-            </div>
+        {/* User */}
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Avatar name={user?.username} size={36} />
             <div>
-              <div style={s.userName}>{user?.username}</div>
-              <div style={s.userRole}>HR Manager</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", ...SORA }}>{user?.username}</div>
+              <div style={{ fontSize: 11, color: "#4dd9c0" }}>HR Manager</div>
             </div>
           </div>
-          <button style={s.logoutBtn} onClick={() => { logoutUser(); navigate('/login') }}>
-            Logout
+          <button onClick={() => { logoutUser(); navigate("/login") }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "rgba(255,255,255,0.6)", fontSize: 13, cursor: "pointer", ...T }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+              <path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Sign out
           </button>
         </div>
       </div>
 
-      {/* Main content */}
-      <div style={s.main}>
+      {/* Main */}
+      <div style={{ flex: 1, padding: "36px 40px", overflowY: "auto" }}>
 
         {/* Header */}
-        <div style={s.header}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, opacity: mounted ? 1 : 0, transform: mounted ? "none" : "translateY(8px)", transition: "all 0.5s ease" }}>
           <div>
-            <h1 style={s.pageTitle}>
-              {activeTab === 'overview' && 'Dashboard'}
-              {activeTab === 'jobs' && 'Job offers'}
-              {activeTab === 'candidates' && 'Candidates'}
-              {activeTab === 'applications' && 'Applications'}
+            <h1 style={{ fontSize: 26, fontWeight: 800, color: "#0f2033", letterSpacing: "-0.03em", marginBottom: 4, ...SORA }}>
+              {tabs.find(t => t.id === activeTab)?.label}
             </h1>
-            <p style={s.pageSubtitle}>
-              {activeTab === 'overview' && 'Overview of your recruitment pipeline'}
-              {activeTab === 'jobs' && `${jobs.length} total positions`}
-              {activeTab === 'candidates' && `${candidates.length} registered candidates`}
-              {activeTab === 'applications' && `${applications.length} total applications`}
+            <p style={{ fontSize: 13.5, color: "#7a9ab5" }}>
+              {activeTab === "overview" && "Your recruitment pipeline at a glance"}
+              {activeTab === "jobs" && `${jobs.length} total positions — ${jobs.filter(j => j.status === "OPEN").length} open`}
+              {activeTab === "candidates" && `${candidates.length} registered candidates`}
+              {activeTab === "applications" && `${applications.length} total applications`}
             </p>
           </div>
-          {activeTab === 'jobs' && (
-            <button style={s.btnPrimary} onClick={() => setShowJobForm(!showJobForm)}>
-              {showJobForm ? '✕ Cancel' : '+ Add job offer'}
+          {activeTab === "jobs" && (
+            <button onClick={() => setShowJobForm(!showJobForm)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", background: showJobForm ? "rgba(220,38,38,0.08)" : "linear-gradient(135deg, #0b2d4a, #0a3d48)", color: showJobForm ? "#dc2626" : "#4dd9c0", border: showJobForm ? "1px solid #fca5a5" : "1px solid rgba(77,217,192,0.3)", borderRadius: 10, fontSize: 13.5, fontWeight: 600, cursor: "pointer", ...T }}>
+              {showJobForm ? (
+                <><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg> Cancel</>
+              ) : (
+                <><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg> Add job offer</>
+              )}
             </button>
           )}
         </div>
 
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div>
-            {/* Stats */}
-            <div style={s.statsGrid}>
-              {[
-                { label: 'Total jobs', value: jobs.length, sub: `${jobs.filter(j => j.status === 'OPEN').length} open`, color: '#6366f1' },
-                { label: 'Candidates', value: candidates.length, sub: 'registered', color: '#8b5cf6' },
-                { label: 'Applications', value: applications.length, sub: 'submitted', color: '#06b6d4' },
-                { label: 'Acceptance rate', value: `${acceptanceRate}%`, sub: `${applications.filter(a => a.status === 'ACCEPTED').length} accepted`, color: '#10b981' },
-              ].map(stat => (
-                <div key={stat.label} style={s.statCard}>
-                  <div style={{ ...s.statValue, color: stat.color }}>{stat.value}</div>
-                  <div style={s.statLabel}>{stat.label}</div>
-                  <div style={s.statSub}>{stat.sub}</div>
-                </div>
-              ))}
+        {/* OVERVIEW */}
+        {activeTab === "overview" && (
+          <div style={{ animation: "fadeUp 0.4s ease" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 16, marginBottom: 28 }}>
+              <StatCard label="Total jobs" value={jobs.length} sub={`${jobs.filter(j => j.status === "OPEN").length} open positions`} icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="#4dd9c0" strokeWidth="1.8"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/></svg>} />
+              <StatCard label="Candidates" value={candidates.length} sub="registered profiles" icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="#4dd9c0" strokeWidth="1.8"/></svg>} />
+              <StatCard label="Applications" value={applications.length} sub="total submitted" icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#4dd9c0" strokeWidth="1.8"/><path d="M14 2v6h6" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/></svg>} />
+              <StatCard label="Acceptance rate" value={`${acceptanceRate}%`} sub={`${applications.filter(a => a.status === "ACCEPTED").length} accepted`} icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/><path d="M22 4L12 14.01l-3-3" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>} />
             </div>
 
-            {/* Recent Applications */}
-            <div style={s.section}>
-              <h2 style={s.sectionTitle}>Recent applications</h2>
-              <div style={s.table}>
-                <div style={s.tableHeader}>
-                  <span>Candidate</span>
-                  <span>Position</span>
-                  <span>Applied</span>
-                  <span>Status</span>
-                  <span>Action</span>
-                </div>
-                {applications.slice(0, 6).map(app => {
-                  const av = avatarColor(app.candidate?.fullName)
-                  const st = statusStyle(app.status)
-                  return (
-                    <div key={app.id} style={s.tableRow}>
-                      <div style={s.candidateCell}>
-                        <div style={{ ...s.avatar, background: av.bg, color: av.color }}>
-                          {initials(app.candidate?.fullName)}
-                        </div>
-                        <div>
-                          <div style={s.candidateName}>{app.candidate?.fullName || 'N/A'}</div>
-                          <div style={s.candidateEmail}>{app.candidate?.email || ''}</div>
-                        </div>
-                      </div>
-                      <span style={s.cellText}>{app.jobOffer?.title || 'N/A'}</span>
-                      <span style={s.cellMuted}>{new Date(app.appliedAt).toLocaleDateString()}</span>
-                      <span style={{ ...s.statusPill, background: st.bg, color: st.color }}>{app.status}</span>
-                      <select
-                        style={s.select}
-                        value={app.status}
-                        onChange={e => handleStatusChange(app.id, e.target.value)}
-                      >
-                        {['PENDING', 'REVIEWED', 'ACCEPTED', 'REJECTED'].map(o => (
-                          <option key={o}>{o}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )
-                })}
+            <div style={{ background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, overflow: "hidden" }}>
+              <div style={{ padding: "16px 22px", borderBottom: "1px solid rgba(200,220,240,0.5)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#0f2033", ...SORA }}>Recent applications</span>
+                <span style={{ fontSize: 12, color: "#7a9ab5" }}>{applications.length} total</span>
               </div>
+              {applications.length === 0 ? (
+                <div style={{ padding: "40px", textAlign: "center", color: "#7a9ab5", fontSize: 14 }}>No applications yet</div>
+              ) : (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#f0f4f8" }}>
+                      {["Candidate", "Position", "Applied on", "Status", "Update"].map(h => (
+                        <th key={h} style={{ padding: "10px 20px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#7a9ab5", letterSpacing: "0.04em", textTransform: "uppercase" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {applications.slice(0, 8).map((app, i) => {
+                      const st = statusColors[app.status] || statusColors.PENDING
+                      return (
+                        <tr key={app.id} style={{ borderTop: "1px solid rgba(200,220,240,0.4)", background: i % 2 === 0 ? "transparent" : "rgba(240,244,248,0.3)" }}>
+                          <td style={{ padding: "12px 20px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <Avatar name={app.candidate?.fullName} size={32} />
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f2033", ...SORA }}>{app.candidate?.fullName || "N/A"}</div>
+                                <div style={{ fontSize: 11, color: "#7a9ab5" }}>{app.candidate?.email || ""}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: "12px 20px", fontSize: 13, color: "#2d4a62" }}>{app.jobOffer?.title || "N/A"}</td>
+                          <td style={{ padding: "12px 20px", fontSize: 12, color: "#7a9ab5" }}>{new Date(app.appliedAt).toLocaleDateString()}</td>
+                          <td style={{ padding: "12px 20px" }}>
+                            <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>{app.status}</span>
+                          </td>
+                          <td style={{ padding: "12px 20px" }}>
+                            <select value={app.status} onChange={e => handleStatusChange(app.id, e.target.value)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #c8d8e8", fontSize: 12, color: "#2d4a62", background: "#fff", cursor: "pointer", outline: "none" }}>
+                              {["PENDING", "REVIEWED", "ACCEPTED", "REJECTED"].map(o => <option key={o}>{o}</option>)}
+                            </select>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         )}
 
-        {/* Jobs Tab */}
-        {activeTab === 'jobs' && (
-          <div>
+        {/* JOBS */}
+        {activeTab === "jobs" && (
+          <div style={{ animation: "fadeUp 0.4s ease" }}>
             {showJobForm && (
-              <div style={s.formCard}>
-                <h3 style={s.formTitle}>Create new job offer</h3>
+              <div style={{ background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, padding: "24px 28px", marginBottom: 24 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f2033", marginBottom: 20, ...SORA }}>Create new job offer</h3>
                 <form onSubmit={handleCreateJob}>
-                  <div style={s.formGrid}>
-                    <div style={s.formField}>
-                      <label style={s.formLabel}>Job title *</label>
-                      <input style={s.formInput} placeholder="e.g. Full-stack Developer" value={newJob.title} onChange={e => setNewJob({ ...newJob, title: e.target.value })} required />
-                    </div>
-                    <div style={s.formField}>
-                      <label style={s.formLabel}>Location</label>
-                      <input style={s.formInput} placeholder="e.g. Tunis, Remote" value={newJob.location} onChange={e => setNewJob({ ...newJob, location: e.target.value })} />
-                    </div>
-                    <div style={s.formField}>
-                      <label style={s.formLabel}>Contract type</label>
-                      <select style={s.formInput} value={newJob.contractType} onChange={e => setNewJob({ ...newJob, contractType: e.target.value })}>
-                        {['CDI', 'CDD', 'Stage', 'Freelance'].map(o => <option key={o}>{o}</option>)}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+                    {[
+                      { label: "Job title *", key: "title", placeholder: "e.g. Full-stack Developer" },
+                      { label: "Location", key: "location", placeholder: "e.g. Tunis, Remote" },
+                    ].map(f => (
+                      <div key={f.key}>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: "#2d4a62", display: "block", marginBottom: 6, letterSpacing: "0.01em" }}>{f.label}</label>
+                        <input value={newJob[f.key]} onChange={e => setNewJob({ ...newJob, [f.key]: e.target.value })} placeholder={f.placeholder} required={f.key === "title"} style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #c8d8e8", borderRadius: 10, fontSize: 13, color: "#1a3550", background: "#fff", outline: "none" }} />
+                      </div>
+                    ))}
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: "#2d4a62", display: "block", marginBottom: 6, letterSpacing: "0.01em" }}>Contract type</label>
+                      <select value={newJob.contractType} onChange={e => setNewJob({ ...newJob, contractType: e.target.value })} style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #c8d8e8", borderRadius: 10, fontSize: 13, color: "#1a3550", background: "#fff", outline: "none" }}>
+                        {["CDI", "CDD", "Stage", "Freelance"].map(o => <option key={o}>{o}</option>)}
                       </select>
                     </div>
-                    <div style={s.formField}>
-                      <label style={s.formLabel}>Deadline *</label>
-                      <input style={s.formInput} type="date" value={newJob.deadline} onChange={e => setNewJob({ ...newJob, deadline: e.target.value })} required />
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: "#2d4a62", display: "block", marginBottom: 6, letterSpacing: "0.01em" }}>Deadline *</label>
+                      <input type="date" value={newJob.deadline} onChange={e => setNewJob({ ...newJob, deadline: e.target.value })} required style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #c8d8e8", borderRadius: 10, fontSize: 13, color: "#1a3550", background: "#fff", outline: "none" }} />
                     </div>
                   </div>
-                  <div style={s.formField}>
-                    <label style={s.formLabel}>Description</label>
-                    <textarea style={{ ...s.formInput, height: '80px', resize: 'vertical' }} placeholder="Describe the role..." value={newJob.description} onChange={e => setNewJob({ ...newJob, description: e.target.value })} />
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#2d4a62", display: "block", marginBottom: 6, letterSpacing: "0.01em" }}>Description</label>
+                    <textarea value={newJob.description} onChange={e => setNewJob({ ...newJob, description: e.target.value })} placeholder="Describe the role and requirements..." rows={3} style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #c8d8e8", borderRadius: 10, fontSize: 13, color: "#1a3550", background: "#fff", outline: "none", resize: "vertical" }} />
                   </div>
-                  <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-                    <button style={s.btnPrimary} type="submit">Create job offer</button>
-                    <button style={s.btnSecondary} type="button" onClick={() => setShowJobForm(false)}>Cancel</button>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button type="submit" style={{ padding: "10px 22px", background: "linear-gradient(135deg, #0b2d4a, #0a3d48)", color: "#4dd9c0", border: "1px solid rgba(77,217,192,0.3)", borderRadius: 10, fontSize: 13.5, fontWeight: 600, cursor: "pointer", ...T }}>Create job offer</button>
+                    <button type="button" onClick={() => setShowJobForm(false)} style={{ padding: "10px 18px", background: "transparent", color: "#7a9ab5", border: "1px solid #c8d8e8", borderRadius: 10, fontSize: 13, cursor: "pointer", ...T }}>Cancel</button>
                   </div>
                 </form>
               </div>
             )}
 
-            <div style={s.jobsGrid}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
               {jobs.map(job => (
-                <div key={job.id} style={s.jobCard}>
-                  <div style={s.jobCardTop}>
-                    <div>
-                      <div style={s.jobTitle}>{job.title}</div>
-                      <div style={s.jobMeta}>
-                        <span>📍 {job.location || 'N/A'}</span>
-                        <span>📅 {job.deadline || 'N/A'}</span>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
-                      <span style={s.contractBadge}>{job.contractType}</span>
-                      <span style={{ ...s.statusPill, ...(job.status === 'OPEN' ? { background: '#d1fae5', color: '#065f46' } : { background: '#fee2e2', color: '#dc2626' }) }}>
-                        {job.status}
-                      </span>
+                <div key={job.id} style={{ background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ width: 42, height: 42, borderRadius: 10, background: "linear-gradient(135deg, #071828, #0b2d4a)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: "#4dd9c0", ...SORA }}>{job.title.charAt(0)}</div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 9px", borderRadius: 20, background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd" }}>{job.contractType}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 9px", borderRadius: 20, ...(job.status === "OPEN" ? { background: "#f0fdf4", color: "#15803d", border: "1px solid #6ee7b7" } : { background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5" }) }}>{job.status}</span>
                     </div>
                   </div>
-                  {job.description && (
-                    <p style={s.jobDesc}>{job.description.slice(0, 100)}{job.description.length > 100 ? '...' : ''}</p>
-                  )}
-                  <div style={s.jobCardFooter}>
-                    <span style={s.jobApps}>
-                      {applications.filter(a => a.jobOffer?.id === job.id).length} applications
-                    </span>
-                    <button style={s.btnDelete} onClick={() => handleDeleteJob(job.id)}>Delete</button>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: "#0f2033", marginBottom: 6, ...SORA }}>{job.title}</div>
+                    <div style={{ display: "flex", gap: 14, fontSize: 12, color: "#7a9ab5" }}>
+                      {job.location && <span>📍 {job.location}</span>}
+                      {job.deadline && <span>📅 {job.deadline}</span>}
+                    </div>
+                  </div>
+                  {job.description && <p style={{ fontSize: 12.5, color: "#7a9ab5", lineHeight: 1.6 }}>{job.description.slice(0, 100)}{job.description.length > 100 ? "..." : ""}</p>}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 10, borderTop: "1px solid rgba(200,220,240,0.5)" }}>
+                    <span style={{ fontSize: 12, color: "#7a9ab5" }}>{applications.filter(a => a.jobOffer?.id === job.id).length} applications</span>
+                    <button onClick={() => handleDeleteJob(job.id)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", background: "rgba(220,38,38,0.06)", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: 8, fontSize: 12, cursor: "pointer", ...T }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}
@@ -295,141 +331,112 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Candidates Tab */}
-        {activeTab === 'candidates' && (
-          <div style={s.section}>
-            <div style={s.table}>
-              <div style={{ ...s.tableHeader, gridTemplateColumns: '2fr 2fr 1fr 1fr' }}>
-                <span>Name</span>
-                <span>Email</span>
-                <span>Phone</span>
-                <span>Applications</span>
-              </div>
-              {candidates.map(c => {
-                const av = avatarColor(c.fullName)
-                return (
-                  <div key={c.id} style={{ ...s.tableRow, gridTemplateColumns: '2fr 2fr 1fr 1fr' }}>
-                    <div style={s.candidateCell}>
-                      <div style={{ ...s.avatar, background: av.bg, color: av.color }}>
-                        {initials(c.fullName)}
-                      </div>
-                      <div style={s.candidateName}>{c.fullName}</div>
-                    </div>
-                    <span style={s.cellMuted}>{c.email}</span>
-                    <span style={s.cellText}>{c.phone || '—'}</span>
-                    <span style={s.cellText}>
-                      {applications.filter(a => a.candidate?.id === c.id).length}
-                    </span>
-                  </div>
-                )
-              })}
+        {/* CANDIDATES */}
+        {activeTab === "candidates" && (
+          <div style={{ animation: "fadeUp 0.4s ease", background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ padding: "16px 22px", borderBottom: "1px solid rgba(200,220,240,0.5)" }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#0f2033", ...SORA }}>{candidates.length} candidates registered</span>
             </div>
+            {candidates.length === 0 ? (
+              <div style={{ padding: "40px", textAlign: "center", color: "#7a9ab5", fontSize: 14 }}>No candidates yet</div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#f0f4f8" }}>
+                    {["Name", "Email", "Phone", "Applications"].map(h => (
+                      <th key={h} style={{ padding: "10px 20px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#7a9ab5", letterSpacing: "0.04em", textTransform: "uppercase" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {candidates.map((c, i) => (
+                    <tr key={c.id} style={{ borderTop: "1px solid rgba(200,220,240,0.4)", background: i % 2 === 0 ? "transparent" : "rgba(240,244,248,0.3)" }}>
+                      <td style={{ padding: "12px 20px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <Avatar name={c.fullName} size={32} />
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#0f2033", ...SORA }}>{c.fullName}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: "12px 20px", fontSize: 13, color: "#7a9ab5" }}>{c.email}</td>
+                      <td style={{ padding: "12px 20px", fontSize: 13, color: "#2d4a62" }}>{c.phone || "—"}</td>
+                     <td style={{ padding: "12px 20px" }}>
+  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <span style={{ fontSize: 12, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd" }}>
+      {applications.filter(a => a.candidate?.id === c.id).length} apps
+    </span>
+    {c.cvPath && (
+      <button
+        onClick={() => handleDownloadCV(c.id, c.fullName)}
+        style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: "rgba(77,217,192,0.08)", border: "1px solid rgba(77,217,192,0.25)", borderRadius: 8, color: "#0a3d48", fontSize: 12, cursor: "pointer", fontWeight: 500 }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/>
+          <path d="M7 10l5 5 5-5M12 15V3" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        CV
+      </button>
+    )}
+  </div>
+</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
 
-        {/* Applications Tab */}
-        {activeTab === 'applications' && (
-          <div style={s.section}>
-            <div style={s.table}>
-              <div style={s.tableHeader}>
-                <span>Candidate</span>
-                <span>Position</span>
-                <span>Applied</span>
-                <span>Status</span>
-                <span>Update</span>
-              </div>
-              {applications.map(app => {
-                const av = avatarColor(app.candidate?.fullName)
-                const st = statusStyle(app.status)
-                return (
-                  <div key={app.id} style={s.tableRow}>
-                    <div style={s.candidateCell}>
-                      <div style={{ ...s.avatar, background: av.bg, color: av.color }}>
-                        {initials(app.candidate?.fullName)}
-                      </div>
-                      <div>
-                        <div style={s.candidateName}>{app.candidate?.fullName || 'N/A'}</div>
-                        <div style={s.candidateEmail}>{app.candidate?.email || ''}</div>
-                      </div>
-                    </div>
-                    <span style={s.cellText}>{app.jobOffer?.title || 'N/A'}</span>
-                    <span style={s.cellMuted}>{new Date(app.appliedAt).toLocaleDateString()}</span>
-                    <span style={{ ...s.statusPill, background: st.bg, color: st.color }}>{app.status}</span>
-                    <select
-                      style={s.select}
-                      value={app.status}
-                      onChange={e => handleStatusChange(app.id, e.target.value)}
-                    >
-                      {['PENDING', 'REVIEWED', 'ACCEPTED', 'REJECTED'].map(o => (
-                        <option key={o}>{o}</option>
-                      ))}
-                    </select>
-                  </div>
-                )
-              })}
+        {/* APPLICATIONS */}
+        {activeTab === "applications" && (
+          <div style={{ animation: "fadeUp 0.4s ease", background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ padding: "16px 22px", borderBottom: "1px solid rgba(200,220,240,0.5)" }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#0f2033", ...SORA }}>{applications.length} total applications</span>
             </div>
+            {applications.length === 0 ? (
+              <div style={{ padding: "40px", textAlign: "center", color: "#7a9ab5", fontSize: 14 }}>No applications yet</div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#f0f4f8" }}>
+                    {["Candidate", "Position", "Applied on", "Status", "Update"].map(h => (
+                      <th key={h} style={{ padding: "10px 20px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#7a9ab5", letterSpacing: "0.04em", textTransform: "uppercase" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {applications.map((app, i) => {
+                    const st = statusColors[app.status] || statusColors.PENDING
+                    return (
+                      <tr key={app.id} style={{ borderTop: "1px solid rgba(200,220,240,0.4)", background: i % 2 === 0 ? "transparent" : "rgba(240,244,248,0.3)" }}>
+                        <td style={{ padding: "12px 20px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <Avatar name={app.candidate?.fullName} size={32} />
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f2033", ...SORA }}>{app.candidate?.fullName || "N/A"}</div>
+                              <div style={{ fontSize: 11, color: "#7a9ab5" }}>{app.candidate?.email || ""}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: "12px 20px", fontSize: 13, color: "#2d4a62" }}>{app.jobOffer?.title || "N/A"}</td>
+                        <td style={{ padding: "12px 20px", fontSize: 12, color: "#7a9ab5" }}>{new Date(app.appliedAt).toLocaleDateString()}</td>
+                        <td style={{ padding: "12px 20px" }}>
+                          <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>{app.status}</span>
+                        </td>
+                        <td style={{ padding: "12px 20px" }}>
+                          <select value={app.status} onChange={e => handleStatusChange(app.id, e.target.value)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #c8d8e8", fontSize: 12, color: "#2d4a62", background: "#fff", cursor: "pointer", outline: "none" }}>
+                            {["PENDING", "REVIEWED", "ACCEPTED", "REJECTED"].map(o => <option key={o}>{o}</option>)}
+                          </select>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
 
       </div>
     </div>
   )
-}
-
-const s = {
-  page: { display: 'flex', minHeight: '100vh', background: '#f8fafc' },
-  sidebar: { width: '240px', background: '#fff', borderRight: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', padding: '24px 16px', position: 'sticky', top: 0, height: '100vh' },
-  sidebarLogo: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '32px', paddingLeft: '8px' },
-  logoDot: { width: '8px', height: '8px', borderRadius: '50%', background: '#6366f1' },
-  logoText: { fontSize: '16px', fontWeight: '700', color: '#1e293b' },
-  nav: { display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 },
-  navItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '8px', border: 'none', background: 'transparent', color: '#64748b', fontSize: '14px', cursor: 'pointer', textAlign: 'left', fontWeight: '400' },
-  navItemActive: { background: '#ede9fe', color: '#6d28d9', fontWeight: '500' },
-  navIcon: { fontSize: '16px' },
-  sidebarFooter: { borderTop: '1px solid #e2e8f0', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' },
-  userCard: { display: 'flex', alignItems: 'center', gap: '10px' },
-  userAvatar: { width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '600', flexShrink: 0 },
-  userName: { fontSize: '13px', fontWeight: '500', color: '#1e293b' },
-  userRole: { fontSize: '11px', color: '#64748b' },
-  logoutBtn: { padding: '8px', background: 'transparent', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#64748b', fontSize: '13px', cursor: 'pointer', width: '100%' },
-  main: { flex: 1, padding: '32px 36px', overflow: 'auto' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' },
-  pageTitle: { fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '4px' },
-  pageSubtitle: { fontSize: '14px', color: '#64748b' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '28px' },
-  statCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px' },
-  statValue: { fontSize: '32px', fontWeight: '700', marginBottom: '4px' },
-  statLabel: { fontSize: '13px', fontWeight: '500', color: '#1e293b', marginBottom: '2px' },
-  statSub: { fontSize: '12px', color: '#64748b' },
-  section: { background: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' },
-  sectionTitle: { fontSize: '16px', fontWeight: '600', color: '#1e293b', padding: '18px 20px', borderBottom: '1px solid #e2e8f0' },
-  table: { width: '100%' },
-  tableHeader: { display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr', padding: '12px 20px', background: '#f8fafc', fontSize: '12px', fontWeight: '500', color: '#64748b', borderBottom: '1px solid #e2e8f0' },
-  tableRow: { display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr', padding: '14px 20px', alignItems: 'center', borderBottom: '1px solid #f1f5f9' },
-  candidateCell: { display: 'flex', alignItems: 'center', gap: '10px' },
-  avatar: { width: '34px', height: '34px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 },
-  candidateName: { fontSize: '13px', fontWeight: '500', color: '#1e293b' },
-  candidateEmail: { fontSize: '11px', color: '#64748b' },
-  cellText: { fontSize: '13px', color: '#374151' },
-  cellMuted: { fontSize: '13px', color: '#64748b' },
-  statusPill: { fontSize: '11px', padding: '3px 10px', borderRadius: '20px', fontWeight: '500', width: 'fit-content' },
-  select: { padding: '5px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px', color: '#374151', background: '#fff', cursor: 'pointer' },
-  btnPrimary: { padding: '9px 18px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '500', cursor: 'pointer' },
-  btnSecondary: { padding: '9px 18px', background: '#fff', color: '#374151', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', cursor: 'pointer' },
-  btnDelete: { padding: '6px 12px', background: '#fff', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' },
-  formCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '24px', marginBottom: '20px' },
-  formTitle: { fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '18px' },
-  formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' },
-  formField: { display: 'flex', flexDirection: 'column', gap: '5px' },
-  formLabel: { fontSize: '12px', fontWeight: '500', color: '#374151' },
-  formInput: { padding: '9px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', outline: 'none', background: '#f8fafc', boxSizing: 'border-box', width: '100%' },
-  jobsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px,1fr))', gap: '16px' },
-  jobCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '20px' },
-  jobCardTop: { display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '12px' },
-  jobTitle: { fontSize: '15px', fontWeight: '600', color: '#1e293b', marginBottom: '6px' },
-  jobMeta: { display: 'flex', gap: '12px', fontSize: '12px', color: '#64748b' },
-  contractBadge: { fontSize: '11px', padding: '3px 8px', borderRadius: '20px', background: '#ede9fe', color: '#6d28d9', fontWeight: '500' },
-  jobDesc: { fontSize: '13px', color: '#64748b', lineHeight: '1.5', marginBottom: '14px' },
-  jobCardFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingTop: '12px' },
-  jobApps: { fontSize: '12px', color: '#64748b' },
 }

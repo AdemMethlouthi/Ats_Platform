@@ -34,3 +34,14 @@ export const getApplicationsByCandidate = (id) => API.get(`/applications/candida
 // Auth
 export const login = (data) => API.post('/auth/login', data)
 export const register = (data) => API.post('/auth/register', data)
+
+export const uploadCV = (candidateId, file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return API.post(`/files/upload-cv/${candidateId}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+export const downloadCV = (candidateId) =>
+  API.get(`/files/download-cv/${candidateId}`, { responseType: 'blob' })
