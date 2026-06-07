@@ -23,8 +23,11 @@ public class JobApplication {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "job_id", nullable = false)
     private JobOffer jobOffer;
+
     private LocalDateTime appliedAt = LocalDateTime.now();
 
     @Enumerated(EnumType.STRING)
     private ApplicationStatus status = ApplicationStatus.PENDING;
+
+    private LocalDateTime interviewDate;
 }

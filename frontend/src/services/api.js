@@ -45,3 +45,6 @@ export const uploadCV = (candidateId, file) => {
 
 export const downloadCV = (candidateId) =>
   API.get(`/files/download-cv/${candidateId}`, { responseType: 'blob' })
+
+export const scheduleInterview = (id, interviewDate) =>
+  API.patch(`/applications/${id}/interview`, { interviewDate })

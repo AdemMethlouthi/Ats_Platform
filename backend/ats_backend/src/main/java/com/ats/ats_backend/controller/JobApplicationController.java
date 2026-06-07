@@ -6,7 +6,10 @@ import com.ats.ats_backend.service.JobApplicationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/applications")
@@ -52,4 +55,12 @@ public class JobApplicationController {
         jobApplicationService.deleteApplication(id);
         return ResponseEntity.noContent().build();
     }
+    @PatchMapping("/{id}/interview")
+public ResponseEntity<JobApplication> scheduleInterview(
+        @PathVariable Long id,
+        @RequestBody Map<String, String> body) {
+    LocalDateTime interviewDate = LocalDateTime.parse(body.get("interviewDate"));
+    JobApplication application = jobApplicationService.scheduleInterview(id, interviewDate);
+    return ResponseEntity.ok(application);
+}
 }
