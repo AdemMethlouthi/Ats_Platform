@@ -5,6 +5,8 @@ import com.ats.ats_backend.entity.ApplicationStatus;
 import com.ats.ats_backend.repository.JobApplicationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -51,4 +53,15 @@ public class JobApplicationService {
     public void deleteApplication(Long id) {
         jobApplicationRepository.deleteById(id);
     }
+
+    public JobApplication scheduleInterview(Long id, LocalDateTime interviewDate) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'scheduleInterview'");
+    }
+    public JobApplication scheduleInterview1(Long id, LocalDateTime interviewDate) {
+    JobApplication application = getApplicationById(id);
+    application.setInterviewDate(interviewDate);
+    application.setStatus(ApplicationStatus.REVIEWED);
+    return jobApplicationRepository.save(application);
+}
 }
