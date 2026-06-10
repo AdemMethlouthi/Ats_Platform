@@ -48,3 +48,5 @@ export const downloadCV = (candidateId) =>
 
 export const scheduleInterview = (id, interviewDate) =>
   API.patch(`/applications/${id}/interview`, { interviewDate })
+export const getMyApplications = (email) =>
+  API.get(`/applications/my-applications/${email}`)

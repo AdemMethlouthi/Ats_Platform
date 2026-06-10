@@ -14,10 +14,17 @@ export default function CandidatePage() {
   const jobId = location.state?.jobId
   const jobTitle = location.state?.jobTitle
 
-  const [form, setForm] = useState({ fullName: "", email: "", phone: "" })
+  const [form, setForm] = useState({
+    fullName: "", email: "", phone: ""
+  })
+  const [appForm, setAppForm] = useState({
+    coverLetter: "",
+    yearsOfExperience: "",
+    linkedinUrl: "",
+    availabilityDate: ""
+  })
   const [cvFile, setCvFile] = useState(null)
   const [cvError, setCvError] = useState("")
-  const [success, setSuccess] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [focusedField, setFocusedField] = useState(null)
@@ -44,18 +51,12 @@ export default function CandidatePage() {
   const handleDrop = (e) => {
     e.preventDefault()
     const file = e.dataTransfer.files[0]
-    if (file) {
-      const fakeEvent = { target: { files: [file] } }
-      handleFileChange(fakeEvent)
-    }
+    if (file) handleFileChange({ target: { files: [file] } })
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!cvFile) {
-      setCvError("Please upload your CV")
-      return
-    }
+    if (!cvFile) { setCvError("Please upload your CV"); return }
     setLoading(true)
     setError("")
 
@@ -65,12 +66,19 @@ export default function CandidatePage() {
       const candidateId = candidateRes.data.id
 
       // Step 2 — Upload CV
-      setUploadProgress(40)
+      setUploadProgress(30)
       await uploadCV(candidateId, cvFile)
-      setUploadProgress(70)
+      setUploadProgress(60)
 
-      // Step 3 — Submit application
-      await applyToJob({ candidate: { id: candidateId }, jobOffer: { id: jobId } })
+      // Step 3 — Submit application with extra fields
+      await applyToJob({
+        candidate: { id: candidateId },
+        jobOffer: { id: jobId },
+        coverLetter: appForm.coverLetter,
+        yearsOfExperience: appForm.yearsOfExperience ? parseInt(appForm.yearsOfExperience) : null,
+        linkedinUrl: appForm.linkedinUrl,
+        availabilityDate: appForm.availabilityDate || null,
+      })
       setUploadProgress(100)
       setSubmitted(true)
     } catch (err) {
@@ -80,6 +88,13 @@ export default function CandidatePage() {
       setUploadProgress(0)
     }
   }
+
+  const inputWrapper = (focused) => ({
+    display: "flex", alignItems: "center", background: "#fff", borderRadius: 10,
+    transition: "box-shadow 0.2s",
+    boxShadow: focusedField === focused ? "0 0 0 2px #1e4a7a" : "0 0 0 1.5px #c8d8e8",
+    padding: "0 14px", gap: 10, height: 50
+  })
 
   if (submitted) return (
     <div style={{ minHeight: "100vh", background: "#eef2f7", display: "flex", alignItems: "center", justifyContent: "center", ...T }}>
@@ -100,16 +115,13 @@ export default function CandidatePage() {
         <p style={{ fontSize: 14, color: "#7a9ab5", lineHeight: 1.6, marginBottom: 8 }}>
           Your application for <strong style={{ color: "#2d4a62" }}>{jobTitle}</strong> has been received.
         </p>
-        <p style={{ fontSize: 13, color: "#7a9ab5", marginBottom: 8 }}>Your CV has been uploaded successfully.</p>
         <p style={{ fontSize: 13, color: "#7a9ab5", marginBottom: 32 }}>The HR team will review your profile and get back to you.</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <button onClick={() => navigate("/jobs")} style={{ width: "100%", height: 48, background: "#1a4880", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, ...SORA }}>
             Browse more jobs
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M5 12h14M12 5l7 7-7 7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
-          <button onClick={() => { setSubmitted(false); setForm({ fullName: "", email: "", phone: "" }); setCvFile(null) }} style={{ width: "100%", height: 44, background: "transparent", color: "#7a9ab5", border: "1px solid #c8d8e8", borderRadius: 12, fontSize: 13, cursor: "pointer", ...T }}>
+          <button onClick={() => { setSubmitted(false); setForm({ fullName: "", email: "", phone: "" }); setAppForm({ coverLetter: "", yearsOfExperience: "", linkedinUrl: "", availabilityDate: "" }); setCvFile(null) }} style={{ width: "100%", height: 44, background: "transparent", color: "#7a9ab5", border: "1px solid #c8d8e8", borderRadius: 12, fontSize: 13, cursor: "pointer", ...T }}>
             Apply to another position
           </button>
         </div>
@@ -124,7 +136,7 @@ export default function CandidatePage() {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
-        input::placeholder { color: #9ab8d0; }
+        input::placeholder, textarea::placeholder { color: #9ab8d0; }
         .drop-zone:hover { border-color: rgba(77,217,192,0.5) !important; background: rgba(77,217,192,0.04) !important; }
       `}</style>
 
@@ -142,23 +154,18 @@ export default function CandidatePage() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button onClick={() => navigate("/jobs")} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "rgba(255,255,255,0.7)", fontSize: 13, cursor: "pointer", ...T }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-              <path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Back to jobs
           </button>
           <button onClick={() => { logoutUser(); navigate("/login") }} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "rgba(255,255,255,0.7)", fontSize: 13, cursor: "pointer", ...T }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-              <path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Sign out
           </button>
         </div>
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth: 680, margin: "0 auto", padding: "48px 24px", animation: "fadeUp 0.5s ease" }}>
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px", animation: "fadeUp 0.5s ease" }}>
 
         {/* Job banner */}
         {jobTitle ? (
@@ -176,162 +183,207 @@ export default function CandidatePage() {
           </div>
         ) : (
           <div style={{ background: "#fef9ec", border: "1px solid #f5d878", borderRadius: 12, padding: "14px 18px", marginBottom: 24, display: "flex", alignItems: "center", gap: 10 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="#92600a" strokeWidth="1.8"/>
-              <path d="M12 9v4M12 17h.01" stroke="#92600a" strokeWidth="1.8" strokeLinecap="round"/>
-            </svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="#92600a" strokeWidth="1.8"/><path d="M12 9v4M12 17h.01" stroke="#92600a" strokeWidth="1.8" strokeLinecap="round"/></svg>
             <span style={{ fontSize: 13, color: "#92600a" }}>No job selected — go back and click Apply now on a position.</span>
           </div>
         )}
 
-        {/* Form card */}
-        <div style={{ background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 20, padding: "36px 40px" }}>
-          <div style={{ marginBottom: 28 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: "#0f2033", letterSpacing: "-0.03em", marginBottom: 6, ...SORA }}>Your information</h1>
-            <p style={{ fontSize: 13.5, color: "#7a9ab5" }}>Fill in your details and upload your CV to apply</p>
+        {error && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fef2f2", border: "1px solid #fca5a5", color: "#dc2626", padding: "10px 14px", borderRadius: 10, fontSize: 13, marginBottom: 20 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" stroke="#dc2626" strokeWidth="1.8"/><path d="M12 8v4M12 16h.01" stroke="#dc2626" strokeWidth="1.8" strokeLinecap="round"/></svg>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+          {/* Section 1 — Personal info */}
+          <div style={{ background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, padding: "28px 32px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #071828, #0b2d4a)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="7" r="4" stroke="#4dd9c0" strokeWidth="1.8"/></svg>
+              </div>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: "#0f2033", ...SORA }}>Personal information</h2>
+                <p style={{ fontSize: 12, color: "#7a9ab5" }}>Your basic contact details</p>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Full name */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#2d4a62", letterSpacing: "0.01em" }}>Full name <span style={{ color: "#dc2626" }}>*</span></label>
+                <div style={inputWrapper("fullName")}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke={focusedField === "fullName" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="7" r="4" stroke={focusedField === "fullName" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8"/></svg>
+                  <input type="text" placeholder="Ahmed Ben Ali" value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} onFocus={() => setFocusedField("fullName")} onBlur={() => setFocusedField(null)} style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "#1a3550", ...T }} required />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                {/* Email */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "#2d4a62", letterSpacing: "0.01em" }}>Email <span style={{ color: "#dc2626" }}>*</span></label>
+                  <div style={inputWrapper("email")}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke={focusedField === "email" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8"/><path d="M22 6l-10 7L2 6" stroke={focusedField === "email" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    <input type="email" placeholder="ahmed@email.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} onFocus={() => setFocusedField("email")} onBlur={() => setFocusedField(null)} style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "#1a3550", ...T }} required />
+                  </div>
+                </div>
+
+                {/* Phone */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "#2d4a62", letterSpacing: "0.01em" }}>Phone <span style={{ color: "#dc2626" }}>*</span></label>
+                  <div style={inputWrapper("phone")}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.08 6.08l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" stroke={focusedField === "phone" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8"/></svg>
+                    <input type="text" placeholder="55 123 456" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} onFocus={() => setFocusedField("phone")} onBlur={() => setFocusedField(null)} style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "#1a3550", ...T }} required />
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {error && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fef2f2", border: "1px solid #fca5a5", color: "#dc2626", padding: "10px 14px", borderRadius: 10, fontSize: 13, marginBottom: 20 }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-                <circle cx="12" cy="12" r="10" stroke="#dc2626" strokeWidth="1.8"/>
-                <path d="M12 8v4M12 16h.01" stroke="#dc2626" strokeWidth="1.8" strokeLinecap="round"/>
-              </svg>
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-            {/* Full name */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#2d4a62", letterSpacing: "0.01em" }}>Full name</label>
-              <div style={{ display: "flex", alignItems: "center", background: "#fff", borderRadius: 10, transition: "box-shadow 0.2s", boxShadow: focusedField === "fullName" ? "0 0 0 2px #1e4a7a" : "0 0 0 1.5px #c8d8e8", padding: "0 14px", gap: 10, height: 50 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke={focusedField === "fullName" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8" strokeLinecap="round"/>
-                  <circle cx="12" cy="7" r="4" stroke={focusedField === "fullName" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8"/>
-                </svg>
-                <input type="text" placeholder="Ahmed Ben Ali" value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} onFocus={() => setFocusedField("fullName")} onBlur={() => setFocusedField(null)} style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "#1a3550", ...T }} required />
+          {/* Section 2 — Professional info */}
+          <div style={{ background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, padding: "28px 32px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #071828, #0b2d4a)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="#4dd9c0" strokeWidth="1.8"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              </div>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: "#0f2033", ...SORA }}>Professional details</h2>
+                <p style={{ fontSize: 12, color: "#7a9ab5" }}>Help HR understand your background</p>
               </div>
             </div>
 
-            {/* Email */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#2d4a62", letterSpacing: "0.01em" }}>Email address</label>
-              <div style={{ display: "flex", alignItems: "center", background: "#fff", borderRadius: 10, transition: "box-shadow 0.2s", boxShadow: focusedField === "email" ? "0 0 0 2px #1e4a7a" : "0 0 0 1.5px #c8d8e8", padding: "0 14px", gap: 10, height: 50 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke={focusedField === "email" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8"/>
-                  <path d="M22 6l-10 7L2 6" stroke={focusedField === "email" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8" strokeLinecap="round"/>
-                </svg>
-                <input type="email" placeholder="ahmed@email.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} onFocus={() => setFocusedField("email")} onBlur={() => setFocusedField(null)} style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "#1a3550", ...T }} required />
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                {/* Years of experience */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "#2d4a62", letterSpacing: "0.01em" }}>Years of experience</label>
+                  <div style={inputWrapper("experience")}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke={focusedField === "experience" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8"/><path d="M12 6v6l4 2" stroke={focusedField === "experience" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    <input type="number" min="0" max="50" placeholder="e.g. 3" value={appForm.yearsOfExperience} onChange={e => setAppForm({ ...appForm, yearsOfExperience: e.target.value })} onFocus={() => setFocusedField("experience")} onBlur={() => setFocusedField(null)} style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "#1a3550", ...T }} />
+                  </div>
+                </div>
+
+                {/* Availability date */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "#2d4a62", letterSpacing: "0.01em" }}>Available from</label>
+                  <div style={inputWrapper("availability")}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke={focusedField === "availability" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8"/><path d="M16 2v4M8 2v4M3 10h18" stroke={focusedField === "availability" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    <input type="date" value={appForm.availabilityDate} min={new Date().toISOString().split("T")[0]} onChange={e => setAppForm({ ...appForm, availabilityDate: e.target.value })} onFocus={() => setFocusedField("availability")} onBlur={() => setFocusedField(null)} style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "#1a3550", ...T }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* LinkedIn URL */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "#2d4a62", letterSpacing: "0.01em" }}>LinkedIn profile</label>
+                <div style={inputWrapper("linkedin")}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" stroke={focusedField === "linkedin" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8" strokeLinecap="round"/><rect x="2" y="9" width="4" height="12" stroke={focusedField === "linkedin" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8"/><circle cx="4" cy="4" r="2" stroke={focusedField === "linkedin" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8"/></svg>
+                  <input type="url" placeholder="https://linkedin.com/in/yourprofile" value={appForm.linkedinUrl} onChange={e => setAppForm({ ...appForm, linkedinUrl: e.target.value })} onFocus={() => setFocusedField("linkedin")} onBlur={() => setFocusedField(null)} style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "#1a3550", ...T }} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3 — Cover letter */}
+          <div style={{ background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, padding: "28px 32px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #071828, #0b2d4a)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#4dd9c0" strokeWidth="1.8"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/></svg>
+              </div>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: "#0f2033", ...SORA }}>Cover letter</h2>
+                <p style={{ fontSize: 12, color: "#7a9ab5" }}>Tell us why you're the right candidate</p>
               </div>
             </div>
 
-            {/* Phone */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#2d4a62", letterSpacing: "0.01em" }}>Phone number</label>
-              <div style={{ display: "flex", alignItems: "center", background: "#fff", borderRadius: 10, transition: "box-shadow 0.2s", boxShadow: focusedField === "phone" ? "0 0 0 2px #1e4a7a" : "0 0 0 1.5px #c8d8e8", padding: "0 14px", gap: 10, height: 50 }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.91a16 16 0 0 0 6.08 6.08l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" stroke={focusedField === "phone" ? "#1e4a7a" : "#7a9ab5"} strokeWidth="1.8"/>
-                </svg>
-                <input type="text" placeholder="55 123 456" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} onFocus={() => setFocusedField("phone")} onBlur={() => setFocusedField(null)} style={{ flex: 1, border: "none", outline: "none", background: "transparent", fontSize: 14, color: "#1a3550", ...T }} required />
+            <textarea
+              placeholder="Dear HR team,&#10;&#10;I am excited to apply for this position because..."
+              value={appForm.coverLetter}
+              onChange={e => setAppForm({ ...appForm, coverLetter: e.target.value })}
+              onFocus={() => setFocusedField("cover")}
+              onBlur={() => setFocusedField(null)}
+              rows={6}
+              style={{ width: "100%", padding: "14px 16px", border: "none", outline: "none", background: "#fff", borderRadius: 10, fontSize: 14, color: "#1a3550", lineHeight: 1.7, resize: "vertical", boxShadow: focusedField === "cover" ? "0 0 0 2px #1e4a7a" : "0 0 0 1.5px #c8d8e8", transition: "box-shadow 0.2s", boxSizing: "border-box", ...T }}
+            />
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
+              <span style={{ fontSize: 11, color: "#c8d8e8" }}>{appForm.coverLetter.length} characters</span>
+            </div>
+          </div>
+
+          {/* Section 4 — CV Upload */}
+          <div style={{ background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, padding: "28px 32px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 22 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #071828, #0b2d4a)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/><path d="M17 8l-5-5-5 5M12 3v12" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>
+              <div>
+                <h2 style={{ fontSize: 15, fontWeight: 700, color: "#0f2033", ...SORA }}>CV / Resume <span style={{ color: "#dc2626" }}>*</span></h2>
+                <p style={{ fontSize: 12, color: "#7a9ab5" }}>PDF only — max 10MB</p>
               </div>
             </div>
 
-            {/* CV Upload */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-              <label style={{ fontSize: 13, fontWeight: 600, color: "#2d4a62", letterSpacing: "0.01em" }}>
-                CV / Resume <span style={{ color: "#dc2626" }}>*</span>
-              </label>
-
-              {!cvFile ? (
-                <div
-                  className="drop-zone"
-                  onDrop={handleDrop}
-                  onDragOver={e => e.preventDefault()}
-                  onClick={() => document.getElementById("cv-input").click()}
-                  style={{ border: `2px dashed ${cvError ? "#fca5a5" : "rgba(77,217,192,0.25)"}`, borderRadius: 12, padding: "28px 20px", textAlign: "center", cursor: "pointer", background: cvError ? "rgba(220,38,38,0.02)" : "rgba(77,217,192,0.02)", transition: "all 0.2s" }}
-                >
-                  <div style={{ width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg, #071828, #0b2d4a)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/>
-                      <path d="M17 8l-5-5-5 5M12 3v12" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: "#2d4a62", marginBottom: 4, ...SORA }}>Drop your CV here or click to browse</p>
-                  <p style={{ fontSize: 12, color: "#7a9ab5" }}>PDF only — max 10MB</p>
-                  <input id="cv-input" type="file" accept=".pdf" onChange={handleFileChange} style={{ display: "none" }} />
+            {!cvFile ? (
+              <div className="drop-zone" onDrop={handleDrop} onDragOver={e => e.preventDefault()} onClick={() => document.getElementById("cv-input").click()} style={{ border: `2px dashed ${cvError ? "#fca5a5" : "rgba(77,217,192,0.25)"}`, borderRadius: 12, padding: "32px 20px", textAlign: "center", cursor: "pointer", background: cvError ? "rgba(220,38,38,0.02)" : "rgba(77,217,192,0.02)", transition: "all 0.2s" }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg, #071828, #0b2d4a)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/><path d="M17 8l-5-5-5 5M12 3v12" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 </div>
-              ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 14, background: "rgba(77,217,192,0.06)", border: "1.5px solid rgba(77,217,192,0.25)", borderRadius: 12, padding: "14px 18px" }}>
-                  <div style={{ width: 42, height: 42, borderRadius: 10, background: "linear-gradient(135deg, #071828, #0b2d4a)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#4dd9c0" strokeWidth="1.8"/>
-                      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/>
-                    </svg>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#0f2033", marginBottom: 2, ...SORA, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cvFile.name}</div>
-                    <div style={{ fontSize: 12, color: "#7a9ab5" }}>{(cvFile.size / 1024 / 1024).toFixed(2)} MB · PDF</div>
-                  </div>
-                  <button type="button" onClick={() => { setCvFile(null); setCvError("") }} style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(220,38,38,0.08)", border: "1px solid #fca5a5", color: "#dc2626", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                      <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                  </button>
+                <p style={{ fontSize: 14, fontWeight: 600, color: "#2d4a62", marginBottom: 4, ...SORA }}>Drop your CV here or click to browse</p>
+                <p style={{ fontSize: 12, color: "#7a9ab5" }}>PDF only — max 10MB</p>
+                <input id="cv-input" type="file" accept=".pdf" onChange={handleFileChange} style={{ display: "none" }} />
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 14, background: "rgba(77,217,192,0.06)", border: "1.5px solid rgba(77,217,192,0.25)", borderRadius: 12, padding: "14px 18px" }}>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: "linear-gradient(135deg, #071828, #0b2d4a)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#4dd9c0" strokeWidth="1.8"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/></svg>
                 </div>
-              )}
-
-              {cvError && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#dc2626" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="#dc2626" strokeWidth="1.8"/>
-                    <path d="M12 8v4M12 16h.01" stroke="#dc2626" strokeWidth="1.8" strokeLinecap="round"/>
-                  </svg>
-                  {cvError}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0f2033", marginBottom: 2, ...SORA, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cvFile.name}</div>
+                  <div style={{ fontSize: 12, color: "#7a9ab5" }}>{(cvFile.size / 1024 / 1024).toFixed(2)} MB · PDF</div>
                 </div>
-              )}
-            </div>
-
-            {/* Upload progress */}
-            {loading && uploadProgress > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#7a9ab5" }}>
-                  <span>{uploadProgress < 40 ? "Creating profile..." : uploadProgress < 70 ? "Uploading CV..." : "Submitting application..."}</span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <div style={{ height: 6, background: "#e2e8f0", borderRadius: 20, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${uploadProgress}%`, background: "linear-gradient(90deg, #1a4880, #4dd9c0)", borderRadius: 20, transition: "width 0.4s ease" }} />
-                </div>
+                <button type="button" onClick={() => { setCvFile(null); setCvError("") }} style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(220,38,38,0.08)", border: "1px solid #fca5a5", color: "#dc2626", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                </button>
               </div>
             )}
 
-            {/* Disclaimer */}
-            <div style={{ display: "flex", gap: 10, padding: "14px 16px", background: "rgba(77,217,192,0.06)", border: "1px solid rgba(77,217,192,0.15)", borderRadius: 10 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
-                <circle cx="12" cy="12" r="10" stroke="#4dd9c0" strokeWidth="1.8"/>
-                <path d="M12 8v4M12 16h.01" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/>
-              </svg>
-              <p style={{ fontSize: 12.5, color: "#7a9ab5", lineHeight: 1.6 }}>
-                Your CV and information will only be used for recruitment purposes and shared with the HR team reviewing this position.
-              </p>
-            </div>
+            {cvError && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#dc2626", marginTop: 8 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="#dc2626" strokeWidth="1.8"/><path d="M12 8v4M12 16h.01" stroke="#dc2626" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                {cvError}
+              </div>
+            )}
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading || !jobId}
-              style={{ width: "100%", height: 52, background: !jobId ? "#c8d8e8" : "#1a4880", color: !jobId ? "#7a9ab5" : "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: !jobId ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.75 : 1, transition: "all 0.2s", ...SORA }}
-              onMouseEnter={e => { if (!loading && jobId) e.currentTarget.style.background = "#163a62" }}
-              onMouseLeave={e => { if (jobId) e.currentTarget.style.background = "#1a4880" }}
-            >
-              {loading ? (
-                <><span style={{ width: 16, height: 16, border: "2.5px solid rgba(255,255,255,0.3)", borderTop: "2.5px solid #fff", borderRadius: "50%", animation: "spin 0.7s linear infinite", display: "inline-block" }} /><span style={{ marginLeft: 10 }}>Submitting...</span></>
-              ) : (
-                <>Submit application <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></>
-              )}
-            </button>
-          </form>
-        </div>
+          {/* Progress bar */}
+          {loading && uploadProgress > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#7a9ab5" }}>
+                <span>{uploadProgress < 30 ? "Creating profile..." : uploadProgress < 60 ? "Uploading CV..." : "Submitting application..."}</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div style={{ height: 6, background: "#e2e8f0", borderRadius: 20, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${uploadProgress}%`, background: "linear-gradient(90deg, #1a4880, #4dd9c0)", borderRadius: 20, transition: "width 0.4s ease" }} />
+              </div>
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading || !jobId}
+            style={{ width: "100%", height: 54, background: !jobId ? "#c8d8e8" : "#1a4880", color: !jobId ? "#7a9ab5" : "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: !jobId ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.75 : 1, transition: "all 0.2s", ...SORA }}
+            onMouseEnter={e => { if (!loading && jobId) e.currentTarget.style.background = "#163a62" }}
+            onMouseLeave={e => { if (jobId) e.currentTarget.style.background = "#1a4880" }}
+          >
+            {loading ? (
+              <><span style={{ width: 16, height: 16, border: "2.5px solid rgba(255,255,255,0.3)", borderTop: "2.5px solid #fff", borderRadius: "50%", animation: "spin 0.7s linear infinite", display: "inline-block" }} /><span style={{ marginLeft: 10 }}>Submitting...</span></>
+            ) : (
+              <>Submit application <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></>
+            )}
+          </button>
+
+        </form>
       </div>
     </div>
   )

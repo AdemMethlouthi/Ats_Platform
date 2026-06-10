@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { getJobs, getCandidates, getApplications, updateStatus, createJob, deleteJob, downloadCV } from "../services/api"
+import { getJobs, getCandidates, getApplications, updateStatus, createJob, deleteJob, downloadCV, scheduleInterview } from "../services/api"
 import { useAuth } from "../context/AuthContext"
 import { useNavigate } from "react-router-dom"
 
@@ -46,12 +46,30 @@ function StatCard({ label, value, sub, icon }) {
   )
 }
 
-function TimelineModal({ app, onClose, onStatusChange }) {
+function TimelineModal({ app, onClose, onStatusChange, onInterviewScheduled }) {
+  const [showInterviewForm, setShowInterviewForm] = useState(false)
+  const [interviewDate, setInterviewDate] = useState("")
+  const [interviewTime, setInterviewTime] = useState("")
+  const [schedulingLoading, setSchedulingLoading] = useState(false)
+  const [schedulingSuccess, setSchedulingSuccess] = useState(false)
+
   const steps = [
-    { key: "PENDING", label: "Applied", desc: "Application received", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg> },
-    { key: "REVIEWED", label: "Under review", desc: "Profile being evaluated", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.8"/><path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg> },
-    { key: "ACCEPTED", label: "Accepted", desc: "Congratulations!", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M22 4L12 14.01l-3-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg> },
-    { key: "REJECTED", label: "Rejected", desc: "Application declined", icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg> },
+    {
+      key: "PENDING", label: "Applied", desc: "Application received",
+      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+    },
+    {
+      key: "REVIEWED", label: "Under review", desc: "Profile being evaluated",
+      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.8"/><path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+    },
+    {
+      key: "ACCEPTED", label: "Accepted", desc: "Congratulations!",
+      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M22 4L12 14.01l-3-3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    },
+    {
+      key: "REJECTED", label: "Rejected", desc: "Application declined",
+      icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M15 9l-6 6M9 9l6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+    },
   ]
 
   const currentIndex = steps.findIndex(s => s.key === app.status)
@@ -78,33 +96,115 @@ function TimelineModal({ app, onClose, onStatusChange }) {
     skip:     { bg: "#f0f4f8", border: "#e2e8f0", color: "#c8d8e8", line: "#e2e8f0" },
   }
 
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(7,24,40,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }} onClick={onClose}>
-      <div style={{ background: "#f7f9fc", borderRadius: 20, padding: "36px 40px", width: "100%", maxWidth: 560, boxShadow: "0 24px 80px rgba(7,24,40,0.3)", border: "1px solid rgba(200,220,240,0.6)", animation: "fadeUp 0.3s ease" }} onClick={e => e.stopPropagation()}>
+  const handleScheduleInterview = async () => {
+    if (!interviewDate || !interviewTime) return
+    setSchedulingLoading(true)
+    try {
+      const isoDate = `${interviewDate}T${interviewTime}:00`
+      await scheduleInterview(app.id, isoDate)
+      setSchedulingSuccess(true)
+      onInterviewScheduled(app.id, isoDate)
+      setTimeout(() => {
+        setShowInterviewForm(false)
+        setSchedulingSuccess(false)
+      }, 2000)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSchedulingLoading(false)
+    }
+  }
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
+  const formatInterviewDate = (dateStr) => {
+    if (!dateStr) return null
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+      weekday: "long", day: "numeric", month: "long", year: "numeric"
+    }) + " at " + new Date(dateStr).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(7,24,40,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 24 }} onClick={onClose}>
+      <div style={{ background: "#f7f9fc", borderRadius: 20, padding: "36px 40px", width: "100%", maxWidth: 580, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(7,24,40,0.35)", border: "1px solid rgba(200,220,240,0.6)", animation: "fadeUp 0.3s ease" }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
           <div>
             <h2 style={{ fontSize: 18, fontWeight: 800, color: "#0f2033", letterSpacing: "-0.02em", marginBottom: 4, ...SORA }}>Application timeline</h2>
-            <p style={{ fontSize: 13, color: "#7a9ab5" }}>Track the progress of this application</p>
+            <p style={{ fontSize: 13, color: "#7a9ab5" }}>Manage and track this application</p>
           </div>
           <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(7,24,40,0.06)", border: "1px solid #c8d8e8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#7a9ab5" }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
           </button>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 14, background: "linear-gradient(135deg, #071828, #0b2d4a)", borderRadius: 14, padding: "16px 20px", marginBottom: 32 }}>
+        {/* Candidate info */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, background: "linear-gradient(135deg, #071828, #0b2d4a)", borderRadius: 14, padding: "16px 20px", marginBottom: 28 }}>
           <Avatar name={app.candidate?.fullName} size={44} />
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 3, ...SORA }}>{app.candidate?.fullName || "N/A"}</div>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{app.candidate?.email || ""}</div>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)" }}>{app.candidate?.email || ""}</div>
           </div>
-          <div style={{ marginLeft: "auto", textAlign: "right" }}>
+          <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 11, color: "rgba(77,217,192,0.7)", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 3 }}>POSITION</div>
             <div style={{ fontSize: 13, color: "#fff", fontWeight: 600, ...SORA }}>{app.jobOffer?.title || "N/A"}</div>
           </div>
         </div>
 
-        <div style={{ position: "relative", marginBottom: 32 }}>
+        {/* Extra application details */}
+        {(app.yearsOfExperience || app.linkedinUrl || app.availabilityDate || app.coverLetter) && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
+            {app.yearsOfExperience && (
+              <div style={{ background: "#f0f4f8", borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ fontSize: 10, color: "#7a9ab5", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 4 }}>EXPERIENCE</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#0f2033", ...SORA }}>{app.yearsOfExperience} year{app.yearsOfExperience !== 1 ? "s" : ""}</div>
+              </div>
+            )}
+            {app.availabilityDate && (
+              <div style={{ background: "#f0f4f8", borderRadius: 10, padding: "12px 14px" }}>
+                <div style={{ fontSize: 10, color: "#7a9ab5", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 4 }}>AVAILABLE FROM</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#0f2033", ...SORA }}>{new Date(app.availabilityDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</div>
+              </div>
+            )}
+            {app.linkedinUrl && (
+              <div style={{ background: "#f0f4f8", borderRadius: 10, padding: "12px 14px", gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: 10, color: "#7a9ab5", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 4 }}>LINKEDIN</div>
+                <a href={app.linkedinUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: "#1a6bbd", fontWeight: 500, textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>{app.linkedinUrl}</a>
+              </div>
+            )}
+            {app.coverLetter && (
+              <div style={{ background: "#f0f4f8", borderRadius: 10, padding: "12px 14px", gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: 10, color: "#7a9ab5", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 6 }}>COVER LETTER</div>
+                <p style={{ fontSize: 13, color: "#2d4a62", lineHeight: 1.6, maxHeight: 80, overflow: "hidden" }}>{app.coverLetter}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Interview date banner */}
+        {app.interviewDate && (
+          <div style={{ display: "flex", alignItems: "center", gap: 12, background: "rgba(77,217,192,0.08)", border: "1px solid rgba(77,217,192,0.25)", borderRadius: 12, padding: "14px 18px", marginBottom: 24 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg, #071828, #0b2d4a)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="4" width="18" height="18" rx="2" stroke="#4dd9c0" strokeWidth="1.8"/>
+                <path d="M16 2v4M8 2v4M3 10h18" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" stroke="#4dd9c0" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: "#4dd9c0", fontWeight: 600, letterSpacing: "0.06em", marginBottom: 2 }}>INTERVIEW SCHEDULED</div>
+              <div style={{ fontSize: 13, color: "#0f2033", fontWeight: 600, ...SORA }}>{formatInterviewDate(app.interviewDate)}</div>
+            </div>
+            <button
+              onClick={() => setShowInterviewForm(true)}
+              style={{ marginLeft: "auto", padding: "5px 10px", background: "transparent", border: "1px solid rgba(77,217,192,0.3)", borderRadius: 8, color: "#4dd9c0", fontSize: 11, cursor: "pointer", fontWeight: 600, ...T }}
+            >
+              Reschedule
+            </button>
+          </div>
+        )}
+
+        {/* Timeline */}
+        <div style={{ position: "relative", marginBottom: 28 }}>
           {steps.filter(s => !(isAccepted && s.key === "REJECTED")).map((step, i, arr) => {
             const stepIndex = steps.findIndex(s2 => s2.key === step.key)
             const state = getStepState(stepIndex)
@@ -139,6 +239,94 @@ function TimelineModal({ app, onClose, onStatusChange }) {
           })}
         </div>
 
+        {/* Interview scheduling form */}
+        {showInterviewForm ? (
+          <div style={{ background: "rgba(77,217,192,0.05)", border: "1px solid rgba(77,217,192,0.2)", borderRadius: 14, padding: "20px 22px", marginBottom: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#0f2033", ...SORA }}>Schedule interview</div>
+              <button onClick={() => setShowInterviewForm(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#7a9ab5", fontSize: 18, lineHeight: 1 }}>×</button>
+            </div>
+
+            {schedulingSuccess ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "#f0fdf4", border: "1px solid #6ee7b7", borderRadius: 10 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="#15803d" strokeWidth="1.8" strokeLinecap="round"/>
+                  <path d="M22 4L12 14.01l-3-3" stroke="#15803d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#15803d", ...SORA }}>Interview scheduled successfully!</span>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#2d4a62", display: "block", marginBottom: 6, letterSpacing: "0.01em" }}>Date</label>
+                    <input
+                      type="date"
+                      value={interviewDate}
+                      min={new Date().toISOString().split("T")[0]}
+                      onChange={e => setInterviewDate(e.target.value)}
+                      style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #c8d8e8", borderRadius: 10, fontSize: 13, color: "#1a3550", background: "#fff", outline: "none", boxSizing: "border-box" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "#2d4a62", display: "block", marginBottom: 6, letterSpacing: "0.01em" }}>Time</label>
+                    <input
+                      type="time"
+                      value={interviewTime}
+                      onChange={e => setInterviewTime(e.target.value)}
+                      style={{ width: "100%", padding: "10px 12px", border: "1.5px solid #c8d8e8", borderRadius: 10, fontSize: 13, color: "#1a3550", background: "#fff", outline: "none", boxSizing: "border-box" }}
+                    />
+                  </div>
+                </div>
+
+                {interviewDate && interviewTime && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: "#f0f4f8", borderRadius: 8, marginBottom: 14 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <circle cx="12" cy="12" r="10" stroke="#7a9ab5" strokeWidth="1.8"/>
+                      <path d="M12 8v4M12 16h.01" stroke="#7a9ab5" strokeWidth="1.8" strokeLinecap="round"/>
+                    </svg>
+                    <span style={{ fontSize: 12, color: "#7a9ab5" }}>
+                      Interview on <strong style={{ color: "#2d4a62" }}>{new Date(`${interviewDate}T${interviewTime}`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} at {interviewTime}</strong>
+                    </span>
+                  </div>
+                )}
+
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={handleScheduleInterview}
+                    disabled={!interviewDate || !interviewTime || schedulingLoading}
+                    style={{ flex: 1, padding: "10px", background: !interviewDate || !interviewTime ? "#c8d8e8" : "linear-gradient(135deg, #0b2d4a, #0a3d48)", color: !interviewDate || !interviewTime ? "#7a9ab5" : "#4dd9c0", border: "1px solid rgba(77,217,192,0.3)", borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: !interviewDate || !interviewTime ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, ...T }}
+                  >
+                    {schedulingLoading ? (
+                      <><span style={{ width: 14, height: 14, border: "2px solid rgba(77,217,192,0.3)", borderTop: "2px solid #4dd9c0", borderRadius: "50%", animation: "spin 0.7s linear infinite", display: "inline-block" }} /> Scheduling...</>
+                    ) : (
+                      <><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8"/><path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg> Confirm interview</>
+                    )}
+                  </button>
+                  <button onClick={() => setShowInterviewForm(false)} style={{ padding: "10px 16px", background: "transparent", border: "1px solid #c8d8e8", borderRadius: 10, color: "#7a9ab5", fontSize: 13, cursor: "pointer", ...T }}>
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          !app.interviewDate && (app.status === "REVIEWED" || app.status === "PENDING") && (
+            <button
+              onClick={() => setShowInterviewForm(true)}
+              style={{ width: "100%", padding: "12px", background: "rgba(77,217,192,0.06)", border: "1.5px dashed rgba(77,217,192,0.35)", borderRadius: 12, color: "#0a3d48", fontSize: 13.5, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 24, ...T }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="4" width="18" height="18" rx="2" stroke="#4dd9c0" strokeWidth="1.8"/>
+                <path d="M16 2v4M8 2v4M3 10h18" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M12 14v4M10 16h4" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/>
+              </svg>
+              Schedule an interview
+            </button>
+          )
+        )}
+
+        {/* Update status */}
         <div style={{ borderTop: "1px solid rgba(200,220,240,0.5)", paddingTop: 20 }}>
           <p style={{ fontSize: 12, fontWeight: 600, color: "#2d4a62", letterSpacing: "0.04em", marginBottom: 12, textTransform: "uppercase" }}>Update status</p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -149,6 +337,7 @@ function TimelineModal({ app, onClose, onStatusChange }) {
             ))}
           </div>
         </div>
+
       </div>
     </div>
   )
@@ -179,6 +368,11 @@ export default function DashboardPage() {
 
   const handleStatusChange = async (id, status) => {
     try { await updateStatus(id, status); fetchAll() } catch (e) { console.error(e) }
+  }
+
+  const handleInterviewScheduled = (id, isoDate) => {
+    setApplications(prev => prev.map(a => a.id === id ? { ...a, interviewDate: isoDate, status: "REVIEWED" } : a))
+    setSelectedApp(prev => prev ? { ...prev, interviewDate: isoDate, status: "REVIEWED" } : prev)
   }
 
   const handleCreateJob = async (e) => {
@@ -229,11 +423,11 @@ export default function DashboardPage() {
     </div>
   )
 
-  const AppTable = ({ apps, showViewButton = true }) => (
+  const AppTable = ({ apps }) => (
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
         <tr style={{ background: "#f0f4f8" }}>
-          {["Candidate", "Position", "Applied on", "Status", "Update", ""].map(h => (
+          {["Candidate", "Position", "Applied on", "Interview", "Status", "Update", ""].map(h => (
             <th key={h} style={{ padding: "10px 20px", textAlign: "left", fontSize: 12, fontWeight: 600, color: "#7a9ab5", letterSpacing: "0.04em", textTransform: "uppercase" }}>{h}</th>
           ))}
         </tr>
@@ -254,6 +448,22 @@ export default function DashboardPage() {
               </td>
               <td style={{ padding: "12px 20px", fontSize: 13, color: "#2d4a62" }}>{app.jobOffer?.title || "N/A"}</td>
               <td style={{ padding: "12px 20px", fontSize: 12, color: "#7a9ab5" }}>{new Date(app.appliedAt).toLocaleDateString()}</td>
+              <td style={{ padding: "12px 20px" }}>
+                {app.interviewDate ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="4" width="18" height="18" rx="2" stroke="#4dd9c0" strokeWidth="1.8"/>
+                      <path d="M16 2v4M8 2v4M3 10h18" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/>
+                    </svg>
+                    <span style={{ fontSize: 11, color: "#0a3d48", fontWeight: 500 }}>
+                      {new Date(app.interviewDate).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                      {" "}{new Date(app.interviewDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 11, color: "#c8d8e8" }}>—</span>
+                )}
+              </td>
               <td style={{ padding: "12px 20px" }}>
                 <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>{app.status}</span>
               </td>
@@ -331,7 +541,6 @@ export default function DashboardPage() {
       {/* Main */}
       <div style={{ flex: 1, padding: "36px 40px", overflowY: "auto" }}>
 
-        {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28, opacity: mounted ? 1 : 0, transform: mounted ? "none" : "translateY(8px)", transition: "all 0.5s ease" }}>
           <div>
             <h1 style={{ fontSize: 26, fontWeight: 800, color: "#0f2033", letterSpacing: "-0.03em", marginBottom: 4, ...SORA }}>
@@ -362,7 +571,7 @@ export default function DashboardPage() {
               <StatCard label="Total jobs" value={jobs.length} sub={`${jobs.filter(j => j.status === "OPEN").length} open positions`} icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="14" rx="2" stroke="#4dd9c0" strokeWidth="1.8"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/></svg>} />
               <StatCard label="Candidates" value={candidates.length} sub="registered profiles" icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="#4dd9c0" strokeWidth="1.8"/></svg>} />
               <StatCard label="Applications" value={applications.length} sub="total submitted" icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="#4dd9c0" strokeWidth="1.8"/><path d="M14 2v6h6" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/></svg>} />
-              <StatCard label="Acceptance rate" value={`${acceptanceRate}%`} sub={`${applications.filter(a => a.status === "ACCEPTED").length} accepted`} icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/><path d="M22 4L12 14.01l-3-3" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>} />
+              <StatCard label="Interviews" value={applications.filter(a => a.interviewDate).length} sub={`${acceptanceRate}% acceptance rate`} icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="18" rx="2" stroke="#4dd9c0" strokeWidth="1.8"/><path d="M16 2v4M8 2v4M3 10h18" stroke="#4dd9c0" strokeWidth="1.8" strokeLinecap="round"/></svg>} />
             </div>
 
             <div style={{ background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, overflow: "hidden" }}>
@@ -418,7 +627,6 @@ export default function DashboardPage() {
                 </form>
               </div>
             )}
-
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
               {jobs.map(job => (
                 <div key={job.id} style={{ background: "#f7f9fc", border: "1px solid rgba(200,220,240,0.6)", borderRadius: 16, padding: "20px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
@@ -530,6 +738,7 @@ export default function DashboardPage() {
             await handleStatusChange(id, status)
             setSelectedApp(prev => ({ ...prev, status }))
           }}
+          onInterviewScheduled={handleInterviewScheduled}
         />
       )}
 

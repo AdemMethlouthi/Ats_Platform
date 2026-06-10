@@ -2,6 +2,7 @@ package com.ats.ats_backend.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -30,4 +31,14 @@ public class JobApplication {
     private ApplicationStatus status = ApplicationStatus.PENDING;
 
     private LocalDateTime interviewDate;
+
+    // New fields
+    @Column(columnDefinition = "TEXT")
+    private String coverLetter;
+
+    private Integer yearsOfExperience;
+
+    private String linkedinUrl;
+
+    private LocalDate availabilityDate;
 }

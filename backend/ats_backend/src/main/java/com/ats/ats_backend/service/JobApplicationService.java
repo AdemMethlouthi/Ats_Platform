@@ -64,4 +64,16 @@ public class JobApplicationService {
     application.setStatus(ApplicationStatus.REVIEWED);
     return jobApplicationRepository.save(application);
 }
+
+    public List<JobApplication> getApplicationsByCandidate(String email) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getApplicationsByCandidate'");
+    }
+    public List<JobApplication> getApplicationsByEmail(String email) {
+    return jobApplicationRepository.findAll()
+            .stream()
+            .filter(a -> a.getCandidate() != null &&
+                    email.equals(a.getCandidate().getEmail()))
+            .collect(java.util.stream.Collectors.toList());
+}
 }

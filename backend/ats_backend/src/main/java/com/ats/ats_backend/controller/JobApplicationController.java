@@ -55,7 +55,7 @@ public class JobApplicationController {
         jobApplicationService.deleteApplication(id);
         return ResponseEntity.noContent().build();
     }
-    @PatchMapping("/{id}/interview")
+@PatchMapping("/{id}/interview")
 public ResponseEntity<JobApplication> scheduleInterview(
         @PathVariable Long id,
         @RequestBody Map<String, String> body) {
@@ -64,3 +64,4 @@ public ResponseEntity<JobApplication> scheduleInterview(
     return ResponseEntity.ok(application);
 }
 }
+
